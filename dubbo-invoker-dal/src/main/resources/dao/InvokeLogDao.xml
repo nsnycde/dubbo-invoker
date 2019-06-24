@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.nsn.dubbo.dubboinvoker.dal.dao.InvokeLogDao">
+
+    <select id="selectLastReqJson" resultType="java.lang.String">
+        select REQ from INVOKE_LOG
+        where CONSUMER_ID = #{consumerId} and USER_ID = #{userId} and METHOD = #{method} order by ID desc limit 1
+    </select>
+</mapper>

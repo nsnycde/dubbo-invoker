@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <!-- import CSS -->
+    <link rel="stylesheet" href="../element-ui/lib/theme-chalk/index.css">
+    <style>
+        .title-class{
+            font-family : "Helvetica Neue",Helvetica,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","微软雅黑",Arial,sans-serif;
+            text-align : center;
+        }
+        .body-class{
+
+        }
+    </style>
+</head>
+<body class="body-class">
+<div id="invoke-fx">
+    <h1 class="title-class">Dubbo&nbsp;&nbsp;&nbsp;接&nbsp;&nbsp;&nbsp;口&nbsp;&nbsp;&nbsp;测&nbsp;&nbsp;&nbsp;试&nbsp;&nbsp;&nbsp;小&nbsp;&nbsp;&nbsp;站</h1>
+
+    <div style="margin-left:50px;"><h3>配置生成</h3></div>
+    <div id="generateDiv" style="margin-left:50px;margin-right:50px">
+        <el-form :inline="true" class="demo-form-inline">
+            <el-row>
+                <el-form-item label="配置类型">
+                    <template>
+                        <el-select v-model="configType" placeholder="请选择">
+                            <el-option
+                                    v-for="item in configTypeList"
+                                    :key="item.value"
+                                    :label="item.value"
+                                    :value="item.value">
+                            </el-option>
+                        </el-select>
+                    </template>
+                </el-form-item>
+                <el-form-item label="配置值">
+                    <el-input v-model="configValue" placeholder="configValue"></el-input>
+                </el-form-item>
+                <el-form-item>
+                    <el-button type="primary" @click="onGenerateConfig">生成</el-button>
+                    <el-popover
+                            placement="bottom"
+                            width="500"
+                            v-model="visible">
+                        <template>
+                            <el-transfer
+                                    filterable
+                                    :titles="['无需重载', '热加载']"
+                                    :filter-method="filterMethod"
+                                    filter-placeholder="请输入jarName"
+                                    v-model="selectJarData"
+                                    :data="jarData">
+                            </el-transfer>
+                        </template>
+
+                        <div style="text-align: right; margin-top: 10px">
+                            <el-button size="mini" type="primary" @click="visible = false">取消</el-button>
+                            <el-button type="primary" size="mini" @click="onHotDeploy">热部署</el-button>
+                        </div>
+                        <el-button type="primary" slot="reference" @click="getJarNameData">热部署</el-button>
+                    </el-popover>
+                </el-form-item>
+            </el-row>
+        </el-form>
+    </div>
+
+    <div style="margin-left:50px;"><h3>配置列表</h3></div>
+    <div id="queryDiv" style="margin-left:50px;margin-right:50px">
+        <el-form :inline="true" class="demo-form-inline">
+            <el-row>
+                <el-form-item label="配置类型">
+                    <template>
+                        <el-select v-model="queryConfigType" placeholder="请选择">
+                            <el-option
+                                    v-for="item in configTypeList"
+                                    :key="item.value"
+                                    :label="item.value"
+                                    :value="item.value">
+                            </el-option>
+                        </el-select>
+                    </template>
+                </el-form-item>
+                <el-form-item label="配置值">
+                    <el-input v-model="queryConfigValue" placeholder="configValue"></el-input>
+                </el-form-item>
+                <el-form-item>
+                    <el-button type="primary" @click="onQueryConfig">查询</el-button>
+                </el-form-item>
+                <el-form-item>
+                    <el-button type="primary" @click="onReloadConfig">重载</el-button>
+                </el-form-item>
+            </el-row>
+        </el-form>
+    </div>
+
+
+    <div id="consumerTable" style="margin-left:50px;margin-right:50px">
+        <template>
+            <el-table
+                    :data="configList"
+                    highlight-current-row
+                    style="width: 100%"
+            >
+                <el-table-column
+                        fixed
+                        prop="configKey"
+                        label="配置名"
+                >
+                </el-table-column>
+                <el-table-column
+                        fixed
+                        prop="configValue"
+                        label="配置值"
+                >
+                </el-table-column>
+                <el-table-column
+                        prop="configId"
+                        v-if="false"
+                >
+                </el-table-column>
+                <el-table-column label="操作">
+                    <template slot-scope="scope">
+                        <el-button
+                                size="mini"
+                                type="danger" icon="el-icon-delete"
+                                @click="handleDelete(scope.$index, scope.row)">删除</el-button>
+                    </template>
+                </el-table-column>
+            </el-table>
+        </template>
+    </div>
+
+</div>
+
+
+
+</body>
+<!-- import Vue before Element -->
+<script src="../vue/vue.min.js"></script>
+<script src="../ajax/axios.min.js"></script>
+<!-- import JavaScript -->
+<script src="../element-ui/lib/index.js"></script>
+<script>
+
+    new Vue({
+        el: '#invoke-fx',
+        data: function() {
+            return {
+                selectJarData: [],
+                jarData: [],
+                visible: false,
+                configValue: '',
+                queryConfigValue: '',
+                configList : [],
+                configType : 'maven-dependency',
+                queryConfigType : 'maven-dependency',
+                configTypeList : [
+                    {
+                        "value" : "nexus-repository"
+                    },
+                    {
+                        "value" : "maven-dependency"
+                    }
+                ],
+            }
+        },
+        //用于数据初始化
+        created:function(){
+            this.onQueryConfig();
+        },
+        methods: {
+            getJarNameData(){
+                let _this = this;
+                let url = "/config/jarNameList";
+                Vue.prototype.$http = axios;
+                this.$http.post(url, {}).then(function (res) {
+                    let result = res.data;
+                    if(result.code != "000000"){
+                        _this.$message.error(result.msg);
+                        return;
+                    }
+                    _this.jarData = [];
+                    result.data.forEach((jarName) => {
+                        _this.jarData.push({
+                            label: jarName,
+                            key: jarName
+                        });
+                    });
+                }).catch(function (error) {
+                    _this.$message.error("加载服务失败：" + error);
+                })
+            },
+            filterMethod(query, item){
+                return item.key.indexOf(query) > -1;
+            },
+            onHotDeploy() {
+                this.visible = false;
+                let params = {
+                    "jarNameList" : this.selectJarData,
+                };
+                let _this = this;
+                let url = "/config/hotDeploy";
+                Vue.prototype.$http = axios;
+                this.$http.post(url, params).then(function (res) {
+                    let result = res.data;
+                    if(result.code != "000000"){
+                        _this.$message.error(result.msg);
+                        return;
+                    }
+                    _this.$message({
+                        message: "热部署成功",
+                        type: 'success'
+                    });
+                }).catch(function (error) {
+                    _this.$message.error("加载服务失败：" + error);
+                })
+                this.selectJarData = [];
+            },
+            onGenerateConfig(){
+                let params = {
+                    "configKey" : this.configType,
+                    "configValue" : this.configValue,
+                };
+                let _this = this;
+                let url = "/config/generate";
+                Vue.prototype.$http = axios;
+                this.$http.post(url, params).then(function (res) {
+                    let result = res.data;
+                    if(result.code != "000000"){
+                        _this.$message.error(result.msg);
+                        return;
+                    }
+                    _this.configList = result.data;
+                }).catch(function (error) {
+                    _this.$message.error("加载服务失败：" + error);
+                })
+            },
+            onReloadConfig() {
+                let _this = this;
+                let url = "/config/reloadAll";
+                Vue.prototype.$http = axios;
+                this.$http.post(url, {}).then(function (res) {
+                    let result = res.data;
+                    if(result.code != "000000"){
+                        _this.$message.error(result.msg);
+                        return;
+                    }
+                    _this.configList = result.data;
+                }).catch(function (error) {
+                    _this.$message.error("加载服务失败：" + error);
+                })
+            },
+            onQueryConfig() {
+                let params = {
+                    "configKey" : this.queryConfigType,
+                    "configValue" : this.queryConfigValue,
+                };
+                let url = "/config/getAll";
+                let _this = this;
+                Vue.prototype.$http = axios;
+                this.$http.post(url, params).then(function (res) {
+                    let result = res.data;
+                    if(result.code != "000000"){
+                        _this.$message.error(result.msg);
+                        _this.configList = null;
+                        return;
+                    }
+                    _this.configList = result.data;
+                }).catch(function (error) {
+                    _this.$message.error("加载服务失败：" + error);
+                })
+            },
+            handleDelete(index, row) {
+                let _this = this;
+                this.$confirm('此操作将永久删除该记录, 是否继续?', '提示', {
+                    confirmButtonText: '确定',
+                    cancelButtonText: '取消',
+                    type: 'warning',
+                    center: true
+                }).then(() => {
+                    let params = {
+                        "configId" : row.configId,
+                        "configKey" : row.configKey,
+                    };
+                    let url = "/config/delete";
+                    Vue.prototype.$http = axios;
+                    this.$http.post(url, params).then(function (res) {
+                        let result = res.data;
+                        if(result.code != "000000"){
+                            _this.$message.error(result.msg);
+                            return;
+                        }
+                        _this.configList = result.data;
+                    }).catch(function (error) {
+                        _this.$message.error("加载服务失败：" + error);
+                    })
+                }).catch(() => {
+                    this.$message({
+                        type: 'info',
+                        message: '已取消删除'
+                    });
+                });
+            },
+        }
+    })
+</script>
+</html>

@@ -1,0 +1,17 @@
+
+server:
+  port: 9999
+
+spring:
+
+  datasource:
+    name: h2
+    url: jdbc:h2:file:~/dubboinvoker
+    username: nsn
+    password: 123456
+    driver-class-name: org.h2.Driver
+
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml,classpath:dao/*.xml
+  type-aliases-package: com.nsn.dubbo.dubboinvoker.dal.po

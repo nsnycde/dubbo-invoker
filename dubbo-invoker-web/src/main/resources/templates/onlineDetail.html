@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<!-- import CSS -->
+	<link rel="stylesheet" href="../element-ui/lib/theme-chalk/index.css">
+	<script src="../handsontable/handsontable.full.min.js"></script>
+	<link  rel="stylesheet" href="../handsontable/handsontable.full.min.css">
+	<style>
+		.title-class{
+			font-family : "Helvetica Neue",Helvetica,"PingFang SC","Hiragino Sans GB","Microsoft YaHei","微软雅黑",Arial,sans-serif;
+			text-align : center;
+		}
+		.body-class{
+
+		}
+		.el-radio-button__inner{
+			border: 1px solid #dcdfe6;
+		}
+		h3{margin-top:10px;}
+	</style>
+</head>
+<body class="body-class">
+<div id="invoke-face">
+	<h1 class="title-class">Dubbo&nbsp;&nbsp;&nbsp;接&nbsp;&nbsp;&nbsp;口&nbsp;&nbsp;&nbsp;测&nbsp;&nbsp;&nbsp;试&nbsp;&nbsp;&nbsp;小&nbsp;&nbsp;&nbsp;站</h1>
+
+	<div style="margin-left:50px;margin-top: 20px;"><h3>接口</h3>{{consumerName}}</div>
+	<div style="margin-left:50px;margin-top: 20px;"><h3>方法列表</h3></div>
+	<div id="configListDiv" style="margin-left:50px;margin-right:50px">
+		<el-radio-group v-model="methodName" @change="onCreateTable()">
+			<el-radio-button :label="methodName" v-for="methodName in methodNames"></el-radio-button>
+		</el-radio-group>
+	</div>
+
+	<div style="margin-left:50px;margin-top: 20px;" id="tableDiv"></div>
+
+	<div style="margin-left:50px;margin-top: 20px;"><h3>请求参数</h3></div>
+	<div id="queryBox" style="margin-left:50px;margin-right:50px">
+		<el-form :inline="true" class="demo-form-inline">
+			<el-row>
+				<el-form-item label="数据行下标">
+					<el-input v-model="dataRowIndex" placeholder="dataRowIndex"></el-input>
+				</el-form-item>
+				<el-form-item>
+					<el-button type="primary" @click="onInvoke">执行</el-button>
+				</el-form-item>
+				<el-form-item>
+					<el-button type="primary" @click="onReloadConsumer">重载</el-button>
+				</el-form-item>
+			</el-row>
+		</el-form>
+	</div>
+
+	<div style="margin-left:50px;"><h3>响应参数</h3></div>
+	<div id="resultDiv" style="margin-left:50px;margin-right:50px">
+		<el-row>
+			<el-input
+					type="textarea"
+					:rows="16"
+					placeholder="响应参数"
+					v-model="responseParams">
+			</el-input>
+		</el-row>
+	</div>
+</div>
+
+
+
+</body>
+<!-- import Vue before Element -->
+<script src="../vue/vue.min.js"></script>
+<script src="../ajax/axios.min.js"></script>
+<!-- import JavaScript -->
+<script src="../element-ui/lib/index.js"></script>
+<script>
+
+    new Vue({
+        el: '#invoke-face',
+        data: function() {
+            let currentUrl = window.location.search;
+            let consumerName = currentUrl.substring(currentUrl.lastIndexOf('=')+1, currentUrl.length);
+            return {
+                consumerName: consumerName,
+                methodName: '',
+                dataRowIndex: '',
+                responseParams : '',
+                methodNames : [],
+				tableDataMap : {},
+            }
+        },
+        //用于数据初始化
+        created:function(){
+            let url = "/consumer/queryConsumer";
+            let params = {
+                "consumerName" : this.consumerName
+            };
+            let _this = this;
+            Vue.prototype.$http = axios;
+            this.$http.post(url, params).then(function (res) {
+                let result = res.data;
+                if(result.code != "000000"){
+                    _this.$message.error(result.msg);
+                    return;
+                }
+                _this.methodNames = result.data;
+            }).catch(function (error) {
+                _this.$message.error("加载服务失败：" + error);
+            })
+        },
+        methods: {
+            onCreateTable() {
+                var container = document.getElementById('tableDiv');
+                var child = container.firstElementChild;
+                var last = container.lastElementChild;
+                while(child != last) {
+                    child.innerHTML = "";
+                    child = child.nextElementSibling;
+                }
+                if(last != null){
+                    last.innerHTML = "";
+                }
+
+                var tableId = "table-" + this.methodName;
+                var currentTable = document.getElementById(tableId);
+                if(currentTable == null){
+                    container.innerHTML += "<div id='" + tableId + "'></div>";
+
+                    let params = {
+                        "consumerName" : this.consumerName,
+                        "methodName" : this.methodName
+                    };
+                    let url = "/consumer/queryTableHeader";
+                    let _this = this;
+                    Vue.prototype.$http = axios;
+                    this.$http.post(url, params).then(function (res) {
+                        let result = res.data;
+                        if(result.code != "000000"){
+                            _this.$message.error(result.msg);
+                            return;
+                        }
+
+                        var data = result.data;
+                        var emptyRow = 4 - data.length;
+                        while(emptyRow-- > 0){
+                            data[data.length] = [];
+                        }
+                        _this.tableDataMap[tableId] = data;
+                        new Handsontable(document.getElementById(tableId), {
+                            data: data,
+                            rowHeaders: true,
+                            //colHeaders: true,
+                            contextMenu: true,
+                        });
+                    }).catch(function (error) {
+                        _this.$message.error("加载服务失败：" + error);
+                    })
+
+                }else{
+                    currentTable = document.getElementById(tableId);
+                    new Handsontable(document.getElementById(tableId), {
+                        data: this.tableDataMap[tableId],
+                        rowHeaders: true,
+                        //colHeaders: true,
+                        contextMenu: true,
+                    });
+				}
+            },
+            onInvoke() {
+            	if(this.dataRowIndex == ""){
+                    this.$message.error("请输入数据行下标!");
+            		return;
+				}
+                var tableDate = this.tableDataMap["table-"+this.methodName];
+                var tableParam = [tableDate[0]];
+                var i = this.dataRowIndex - 1;
+                var size = tableDate.length;
+                while(i < size){
+                    tableParam[tableParam.length] = tableDate[i++];
+				}
+                let params = {
+                    "consumerName" : this.consumerName,
+                    "methodName" : this.methodName,
+					"params" : tableParam
+                };
+                let url = "/consumer/invoke";
+                let _this = this;
+                Vue.prototype.$http = axios;
+                this.$http.post(url, params).then(function (res) {
+                    let result = res.data;
+                    if(result.code != "000000"){
+                        _this.$message.error(result.msg);
+                        return;
+                    }
+                    _this.responseParams = JSON.stringify(result.data, null, "\t");
+                }).catch(function (error) {
+                    _this.$message.error("加载服务失败：" + error);
+                })
+            },
+            onReloadConsumer() {
+                let _this = this;
+                let url = "/consumer/reloadConsumer";
+                let params = {
+                    "consumerName" : this.consumerName
+                };
+                Vue.prototype.$http = axios;
+                this.$http.post(url, params).then(function (res) {
+                    let result = res.data;
+                    if(result.code != "000000"){
+                        _this.$message.error(result.msg);
+                        return;
+                    }
+                    _this.methodNames = result.data;
+                    _this.methodName = null;
+                }).catch(function (error) {
+                    _this.$message.error("加载服务失败：" + error);
+                })
+            },
+        }
+    })
+</script>
+
+</html>
