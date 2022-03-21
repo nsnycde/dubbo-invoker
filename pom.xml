@@ -25,7 +25,7 @@
 
         <h2.version>1.4.196</h2.version>
 
-        <dubbo.version>2.6.0</dubbo.version>
+        <dubbo.version>2.6.9</dubbo.version>
 
         <hessian.version>4.0.7</hessian.version>
 
